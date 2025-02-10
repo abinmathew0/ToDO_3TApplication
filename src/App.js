@@ -1,28 +1,17 @@
-// src/App.js
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import "./App.css";
 
-// Navigation Bar Component
+const API_URL =
+  "https://backend3ta-dcfue8fsbrfrh4b4.canadacentral-01.azurewebsites.net";
+
 const NavBar = () => (
   <nav className="navbar">
     <div className="container">
       <h1 className="logo">Task Manager</h1>
-      <ul className="nav-links">
-        <li>
-          <a href="/">Home</a>
-        </li>
-        <li>
-          <a href="/">About</a>
-        </li>
-        <li>
-          <a href="/">Contact</a>
-        </li>
-      </ul>
     </div>
   </nav>
 );
 
-// Footer Component
 const Footer = () => (
   <footer className="footer">
     <div className="container">
@@ -38,33 +27,61 @@ function App() {
   const [newTask, setNewTask] = useState("");
   const [tasks, setTasks] = useState([]);
 
+  // Fetch tasks from the backend
+  useEffect(() => {
+    fetch(`${API_URL}/tasks`)
+      .then((res) => res.json())
+      .then((data) => setTasks(data))
+      .catch((error) => console.error("Error fetching tasks:", error));
+  }, []);
+
   // Add a new task
-  const handleAddTask = (e) => {
+  const handleAddTask = async (e) => {
     e.preventDefault();
     if (!newTask.trim()) return;
 
-    const task = {
-      id: Date.now(),
-      text: newTask,
-      completed: false,
-    };
+    const response = await fetch(`${API_URL}/tasks`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text: newTask }),
+    });
 
-    setTasks([...tasks, task]);
-    setNewTask("");
+    if (response.ok) {
+      const newTaskFromServer = await response.json();
+      setTasks([...tasks, newTaskFromServer]);
+      setNewTask("");
+    } else {
+      console.error("Failed to add task");
+    }
   };
 
   // Toggle task completion
-  const toggleTask = (id) => {
-    const updatedTasks = tasks.map((task) =>
-      task.id === id ? { ...task, completed: !task.completed } : task
-    );
-    setTasks(updatedTasks);
+  const toggleTask = async (id, completed) => {
+    const response = await fetch(`${API_URL}/tasks/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ completed: !completed }),
+    });
+
+    if (response.ok) {
+      const updatedTask = await response.json();
+      setTasks(tasks.map((task) => (task.id === id ? updatedTask : task)));
+    } else {
+      console.error("Failed to update task");
+    }
   };
 
   // Delete a task
-  const deleteTask = (id) => {
-    const updatedTasks = tasks.filter((task) => task.id !== id);
-    setTasks(updatedTasks);
+  const deleteTask = async (id) => {
+    const response = await fetch(`${API_URL}/tasks/${id}`, {
+      method: "DELETE",
+    });
+
+    if (response.ok) {
+      setTasks(tasks.filter((task) => task.id !== id));
+    } else {
+      console.error("Failed to delete task");
+    }
   };
 
   return (
@@ -91,7 +108,10 @@ function App() {
                 key={task.id}
                 className={`task-item ${task.completed ? "completed" : ""}`}
               >
-                <span onClick={() => toggleTask(task.id)} className="task-text">
+                <span
+                  onClick={() => toggleTask(task.id, task.completed)}
+                  className="task-text"
+                >
                   {task.text}
                 </span>
                 <button
